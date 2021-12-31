@@ -19,17 +19,16 @@ def train(params, log):
     vocab = data.dataset[TRAIN].vocab
 
     # specify model
-    encoder, decoder = ModelFactory.create(params, vocab)
+    model = ModelFactory.create(params, vocab)
 
     # define loss function (criterion)
     criterion = set_loss_function(params)
 
     # optimizer & scheduler & load from checkpoint
-    optimizer, scheduler, start_epoch, best_prec = set_optimizer_scheduler(params, encoder, decoder, log)
+    optimizer, scheduler, start_epoch, best_score = set_optimizer_scheduler(params, model, log)
 
     # log details
-    log_string = "\n" + "==== NET ENCODER MODEL:\n" + str(encoder)
-    log_string = "\n" + "==== NET DECODER MODEL:\n" + str(decoder)
+    log_string = "\n" + "==== NET MODEL:\n" + str(model)
     log_string += "\n" + "==== OPTIMIZER:\n" + str(optimizer) + "\n"
     log_string += "\n" + "==== SCHEDULER:\n" + str(scheduler) + "\n"
     log_string += "\n" + "==== DATASET (TRAIN):\n" + str(data.dataset['train']) + "\n" ### add daset __repr__
@@ -41,14 +40,14 @@ def train(params, log):
     for epoch in range(start_epoch, params['TRAIN']['epochs']):
 
         # train for one epoch
-        _, _ = train_epoch(data.loader[TRAIN], encoder, decoder, criterion, optimizer, scheduler, epoch,
+        _, _ = train_epoch(data.loader[TRAIN], model, criterion, optimizer, scheduler, epoch,
                            device, log)
 
         # evaluate on train set
-        acc_train, loss_train = validate(data.loader[TRAIN], encoder, decoder, criterion, device)
+        acc_train, loss_train = validate(data.loader[TRAIN], model, criterion, device)
 
         # evaluate on validation set
-        acc_val, loss_val = validate(data.loader[VAL], encoder, decoder, criterion, device)
+        acc_val, loss_val = validate(data.loader[VAL], model, criterion, device)
 
         is_best=False
         # # remember best prec@1

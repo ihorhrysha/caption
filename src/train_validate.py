@@ -7,8 +7,7 @@ from thirdparty.meters import AverageMeter, accuracy
 
 def train_epoch(
     train_loader, 
-    encoder: Module, 
-    decoder: Module, 
+    model: Module, 
     criterion, 
     optimizer, 
     scheduler, 
@@ -20,8 +19,7 @@ def train_epoch(
     top1 = AverageMeter()
     
     # switch to train mode ???
-    encoder.train()
-    decoder.train()
+    model.train()
 
     # number of training samples
     num_iter = len(train_loader)
@@ -33,8 +31,7 @@ def train_epoch(
         targets = pack_padded_sequence(captions, lengths, batch_first=True)[0]
 
         # compute output
-        features = encoder(images)
-        outputs = decoder(features, captions, lengths)
+        outputs = model(images, captions, lengths)
         loss = criterion(outputs, targets)
 
         # measure accuracy ??? and record loss
@@ -43,10 +40,9 @@ def train_epoch(
         # prec1 = accuracy(output, target)
         # top1.update(prec1[0], images.size(0))
 
-        # compute gradient and do optimizer step
-        # optimizer.zero_grad() # ???
-        decoder.zero_grad()
-        encoder.zero_grad()
+        # Zero the gradients.
+        optimizer.zero_grad()
+        # Feed forward
         loss.backward()
         optimizer.step()
 
@@ -61,13 +57,12 @@ def train_epoch(
     return top1.avg.to('cpu').item(), losses.avg.to('cpu').item()
 
 
-def validate(val_loader, encoder, decoder, criterion, device):
+def validate(val_loader, model, criterion, device):
     top1 = AverageMeter()
     losses = AverageMeter()
 
     # switch to evaluate mode
-    encoder.eval()
-    decoder.eval()
+    model.eval()
 
     with torch.no_grad():
         for i, (images, captions, lengths) in enumerate(val_loader):
@@ -77,8 +72,7 @@ def validate(val_loader, encoder, decoder, criterion, device):
             targets = pack_padded_sequence(captions, lengths, batch_first=True)[0]
 
             # compute output
-            features = encoder(images)
-            outputs = decoder(features, captions, lengths)
+            outputs = model(images, captions, lengths)
             loss = criterion(outputs, targets)
 
             # measure accuracy and record loss

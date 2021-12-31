@@ -2,9 +2,9 @@ import torch
 from utils import load_checkpoint
 
 
-def set_optimizer_scheduler(params, encoder, decoder, log):
+def set_optimizer_scheduler(params, model, log):
     
-    model_params = list(decoder.parameters()) + list(encoder.linear.parameters()) + list(encoder.bn.parameters())
+    model_params = model.parameters()
 
     # optimizer
     if params['TRAIN']['optim'] == "sgd":

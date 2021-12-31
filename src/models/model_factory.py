@@ -1,4 +1,5 @@
 from models.resnet_152_lstm import DecoderRNN, EncoderCNN
+from models.resnet_50_lstm import ResNet50LSTM
 
 import torch
 from models.init_net import init_net
@@ -17,16 +18,23 @@ class ModelFactory(object):
         :return: Model instance. In case of unknown Model type throws exception.
         """
 
-        if params['MODEL']['name'] == 'resnet_152_lstm':
+        # if params['MODEL']['name'] == 'resnet_152_lstm':
             
-            encoder = EncoderCNN(
-                embed_size=params['MODEL']['encoder']['embed_size']
-            )
-            decoder = DecoderRNN(
-                embed_size=params['MODEL']['encoder']['embed_size'],
-                hidden_size=params['MODEL']['decoder']['hidden_size'],
+        #     encoder = EncoderCNN(
+        #         embed_size=params['MODEL']['encoder']['embed_size']
+        #     )
+        #     decoder = DecoderRNN(
+        #         embed_size=params['MODEL']['encoder']['embed_size'],
+        #         hidden_size=params['MODEL']['decoder']['hidden_size'],
+        #         vocab_size=len(vocab),
+        #         num_layers=params['MODEL']['decoder']['num_layers']
+        #     )
+        if params['MODEL']['name'] == 'resnet_50_lstm':
+            model = ResNet50LSTM(
+                embed_size=params['MODEL']['embed_size'],
+                hidden_size=params['MODEL']['hidden_size'],
                 vocab_size=len(vocab),
-                num_layers=params['MODEL']['decoder']['num_layers']
+                num_layers=params['MODEL']['num_layers']
             )
         else:
             raise ValueError("ModelFactory(): Unknown Model type: " + params['Model']['type'])
@@ -36,7 +44,6 @@ class ModelFactory(object):
         # else:
         #     init_net(net, params['MODEL']['init'])
 
-        encoder = encoder.to(params['device'])
-        decoder = decoder.to(params['device'])
+        model = model.to(params['device'])
 
-        return encoder, decoder
+        return model
