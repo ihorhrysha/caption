@@ -1,5 +1,7 @@
 from typing import Union
 from datasets.ds_coco import CocoDataProvider
+from datasets.ds_flickr8k import Flickr8kProvider
+
 
 
 class DatasetFactory(object):
@@ -8,7 +10,7 @@ class DatasetFactory(object):
     """
 
     @staticmethod
-    def create(params) -> CocoDataProvider:
+    def create(params) -> Union[CocoDataProvider, Flickr8kProvider]:
         """
         Creates Dataset based on detector type
         :param params: Dataset settings
@@ -17,6 +19,13 @@ class DatasetFactory(object):
 
         if params['DATASET']['name'] == 'coco':
             return CocoDataProvider(params['DATASET']['path'],
+                              batch_sizes=params['DATASET']['batch_sizes'],
+                              tiny=params['DATASET']['tiny'],
+                              transform_keys=params['DATASET']['transforms'],
+                              num_workers=params['DATASET']['num_workers']
+                              )
+        elif params['DATASET']['name'] == 'flickr8k':
+            return Flickr8kProvider(params['DATASET']['path'],
                               batch_sizes=params['DATASET']['batch_sizes'],
                               tiny=params['DATASET']['tiny'],
                               transform_keys=params['DATASET']['transforms'],

@@ -27,13 +27,13 @@ MODEL:
     num_layers: 1
 
 DATASET:
-  name: "coco"
-  path: "data/coco/"
+  name: "flickr8k"
+  path: "data/flickr8k/"
   batch_sizes:
-    train: 128                # input batch size for training
-    val: 128                  # input batch size for testing
+    train: 256                # input batch size for training
+    val: 256                  # input batch size for testing
   download: False
-  num_workers: 2
+  num_workers: 4
   transforms:
     train: "init"             # "init", "augment", "augment_simple"
     val: "init"                  # "init"

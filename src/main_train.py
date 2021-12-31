@@ -35,7 +35,7 @@ def train(params, log):
     log_string += "\n" + "==== DATASET (TRAIN):\n" + str(data.dataset['train']) + "\n" ### add daset __repr__
     log_string += "\n" + "==== DATASET (VAL):\n" + repr(data.dataset['val']) + "\n"
     log.log_global(log_string)
-
+   
     # train
     device = params['device']
     for epoch in range(start_epoch, params['TRAIN']['epochs']):

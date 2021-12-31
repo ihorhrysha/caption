@@ -24,6 +24,8 @@ experiments/logs/**/
 *.pth*
 *.pkl*
 
+wandb
+
 # experiments log files
 #classification/experiments/logs
 

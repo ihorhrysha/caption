@@ -32,6 +32,7 @@ class Logger(object):
 
         self.with_visdom = params['LOG']['visdom']
         self.with_tensorboard = params['LOG']['tensorboard']
+        self.with_wandb = params['LOG'].get('wandb', False)
 
         self.experiment_name = params['experiment_name']
         self.iter_interval = params['LOG']['iter_interval']
@@ -65,6 +66,17 @@ class Logger(object):
         # timer
         self.timers = {'global': Timer()}
         self.timers['global'].tic()
+
+        if self.with_wandb:
+            import wandb
+            wandb.init(project="image-captioning", entity="grego")
+
+            wandb.config = {
+                **params['MODEL'],
+                **params['TRAIN'],
+                **params['DATASET']
+            }
+            self.wandb = wandb
 
         # make visdom logging
         if self.with_visdom:
@@ -150,6 +162,12 @@ class Logger(object):
             self.writer_tb.add_scalar('Train/Accuracy', acc_train, n_epoch)
             self.writer_tb.add_scalar('Test/Loss', loss_val, n_epoch)
             self.writer_tb.add_scalar('Test/Accuracy', acc_val, n_epoch)
+
+        if self.with_wandb:
+            self.wandb.log({
+                "loss_train": loss_train, 
+                "loss_val": loss_val
+            })
 
     def log_global(self, log_str):
         self.f_log_global.write(log_str + "\n")
