@@ -1,23 +1,33 @@
 import os
+from typing import Callable, Optional
 from pandas.core.frame import DataFrame
 
 import torch
 
-import nltk
 from PIL import Image
 import pandas as pd
 
-from datasets.transforms_flickr8k import transforms
+from datasets.transforms import get_transforms, get_tokenizer
 from datasets.vocab import VocabularyBuilder, Vocabulary
-import torch.utils.data as data
+# import torch.utils.data as data
+from torchvision.datasets import VisionDataset
+from torch.utils.data import DataLoader
 from constants import TRAIN,VAL
 from datasets.collate import collate_fn
 
 
 
-class Flickr8kDataset(data.Dataset):
+class Flickr8kDataset(VisionDataset):
     """Flickr8kDataset Custom Dataset compatible with torch.utils.data.DataLoader."""
-    def __init__(self, root, filename_caption:DataFrame, vocab_path, transform=None):
+
+    def __init__(self, 
+        root: str, 
+        filename_caption:DataFrame, 
+        transform: Optional[Callable] = None, 
+        target_transform: Optional[Callable] = None,
+        ) -> None:
+        super().__init__(root, transform=transform, target_transform=target_transform)
+    
         """Set the path for images, captions and vocabulary wrapper.
         
         Args:
@@ -25,47 +35,36 @@ class Flickr8kDataset(data.Dataset):
             captions: coco annotation file path.
             vocab_path: path to vocab pkl
             transform: image transformer.
-        """
-        self.root = root
-        
+        """       
         self.imgs = filename_caption["image"].to_list()
         self.captions = filename_caption["caption"].to_list()
-
-        self.vocab: Vocabulary = VocabularyBuilder.get(
-            captions=self.captions,
-            threshold=5, # TODO also good candidate for experiments
-            vocab_path=vocab_path,
-            tokenizer=self.tokenizer
-        )
-        self.transform = transform
-    
-    @staticmethod
-    def tokenizer(caption:str)-> list[str]:
-        # TODO try spacy[en] and make toketizer configurable
-        return nltk.tokenize.word_tokenize(str(caption).lower())
 
     def __getitem__(self, index):
         """Returns one data pair (image and caption)."""
 
         img_path = os.path.join(self.root, self.imgs[index])
-        image = Image.open(img_path).convert('RGB')
-        if self.transform is not None:
-            image = self.transform(image)
 
-        # Convert caption (string) to word ids.
-        target = torch.Tensor([
-            self.vocab(self.vocab.START),
-            *[self.vocab(token) for token in self.tokenizer(self.captions[index])],
-            self.vocab(self.vocab.END)
-        ])
-        return image, target
+        return self.transforms(
+            input=Image.open(img_path).convert('RGB'),
+            target=self.captions[index]
+        )
+        # if self.transform is not None:
+        #     image = self.transform(image)
+
+        # # Convert caption (string) to word ids.
+        # target = torch.Tensor([
+        #     self.vocab(self.vocab.START),
+        #     *[self.vocab(token) for token in self.tokenizer(self.captions[index])],
+        #     self.vocab(self.vocab.END)
+        # ])
+        # return image, target
 
     def __len__(self):
         return len(self.imgs)
 
 class Flickr8kProvider:
     """
-    Class to manage COCO caption train and val datasets
+    Class to manage Flickr8k caption train and val datasets
     """
 
     def __init__(self,
@@ -76,13 +75,13 @@ class Flickr8kProvider:
                  batch_sizes=None,
                  download=False,
                  tiny=False,
-                 transform_keys=None):
+                 transform_config=None):
 
         path_ann = path_ann or os.path.join(path_data, 'captions.txt')
-        path_vocab = path_vocab or os.path.join(path_data, 'vocab')
+        path_vocab = path_vocab or path_data
 
-        transform_keys = transform_keys or {TRAIN: "init", VAL: "init"}
         batch_sizes = batch_sizes or {TRAIN: 64, VAL: 64}
+        transform_config = transform_config or {TRAIN: 'flickr8k_init', VAL: 'flickr8k_init', 'tokenizer':'nltk', 'threshold':4}
                 
         # as we have only one file here is a simple way to split our dataset
         df_ann = pd.read_csv(path_ann)
@@ -91,17 +90,32 @@ class Flickr8kProvider:
         filename_caption = {TRAIN: df_ann[:val_cutoff], VAL: df_ann[val_cutoff:]}
         
         self.dataset: dict[str, Flickr8kDataset] = {}
-        self.loader: dict[str, data.DataLoader] = {}
-        for data_type in [TRAIN, VAL]:
+        self.loader: dict[str, DataLoader] = {}
+        
+        # we need only one vocab for train dataset, validation should be done with train vocab,
+        # it is better to store vocab on provider level
+        self.vocab = VocabularyBuilder.get(
+            captions=filename_caption[TRAIN]["caption"].to_list(),
+            threshold=transform_config['threshold'],
+            vocab_path=os.path.join(path_vocab,f'vocab.pkl'),
+            tokenizer=get_tokenizer(transform_config['tokenizer'])
+        )    
 
+        for data_type in [TRAIN, VAL]:
+            
+            transform, target_transform = get_transforms(
+                key=transform_config[data_type],
+                tokenizer_key=transform_config['tokenizer'],
+                vocab=self.vocab
+            )
             self.dataset[data_type] = Flickr8kDataset(
                 root=os.path.join(path_data, 'Images'),
                 filename_caption=filename_caption[data_type],
-                vocab_path=os.path.join(path_vocab,f'{data_type}.pkl'),
-                transform=transforms[transform_keys[data_type]]
+                transform=transform,
+                target_transform=target_transform,
             )
 
-            self.loader[data_type] = data.DataLoader(
+            self.loader[data_type] = DataLoader(
                 dataset=self.dataset[data_type],
                 batch_size=batch_sizes[data_type],
                 shuffle=(data_type == TRAIN),

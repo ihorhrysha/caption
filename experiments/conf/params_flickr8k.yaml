@@ -33,8 +33,11 @@ DATASET:
   download: False
   num_workers: 4
   transforms:
-    train: "init"             # "init", "augment", "augment_simple"
-    val: "init"                  # "init"
+    tokenizer: "nltk" 
+    threshold: 5
+    train: "flickr8k"           
+    val: "flickr8k_init"             
+
   tiny: False
 
 LOG:

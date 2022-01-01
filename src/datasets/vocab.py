@@ -1,5 +1,5 @@
  
-from typing import Union
+from typing import Iterable, Union
 import pickle
 import os
 from collections import Counter
@@ -28,12 +28,18 @@ class Vocabulary:
             self.idx2word[self.idx] = word
             self.idx += 1
 
-    def __call__(self, word_or_index:Union[int,str], return_index:bool=True) -> Union[str,int]:
+    def _call_one(self, word_or_index:Union[int,str], return_index:bool=True) -> Union[str,int]:
         if return_index:
             return self.word2idx.get(word_or_index, self.word2idx[self.UNK])
         else:
             # return word
             return self.idx2word.get(word_or_index, self.UNK)
+
+    def __call__(self, word_or_index:Union[int,str], return_index:bool=True) -> Union[str,int]:
+        if isinstance(word_or_index, list):
+            return [self._call_one(word_or_index=one, return_index=return_index) for one in word_or_index]
+        else:
+            self._call_one(word_or_index=word_or_index, return_index=return_index)
             
 
     def __len__(self):
