@@ -1,18 +1,16 @@
-from typing import Callable, Tuple
+from typing import Callable, Tuple, List
 from torch.functional import Tensor
 import torchvision.transforms as T
-
+import nltk
 from datasets.vocab import Vocabulary
 
-def tokenize_nltk(caption:str)-> list[str]:
-    import nltk
-    nltk.download('punkt')
+def tokenize_nltk(caption:str)-> List[str]:
     return nltk.tokenize.word_tokenize(str.lower(caption))
 
-def caption_to_tensor(tokens: list[str]) -> Tensor:
+def caption_to_tensor(tokens: List[str]) -> Tensor:
     return Tensor(tokens)
 
-def add_start_end(tokens: list[str]) -> list[str]:
+def add_start_end(tokens: List[str]) -> List[str]:
     return [Vocabulary.START] + tokens + [Vocabulary.END]
 
 MEAN = [0.485, 0.456, 0.406]
@@ -57,7 +55,7 @@ class CaptionsTokenizer:
     def __init__(self, tokenizer) -> None:
         self.tokenizer = tokenizer
 
-    def __call__(self, captions:list[str])->list[list[str]]:
+    def __call__(self, captions:List[str])->List[List[str]]:
         return [self.tokenizer(caption) for caption in captions]
 
     def __repr__(self):

@@ -1,4 +1,5 @@
 import os
+from typing import List
 
 import torch
 
@@ -35,7 +36,7 @@ class CocoDataset(data.Dataset):
         self.transform = transform
     
     @staticmethod
-    def tokenizer(caption:str)-> list[str]:
+    def tokenizer(caption:str)-> List[str]:
         return nltk.tokenize.word_tokenize(str(caption).lower())
 
     def __getitem__(self, index):

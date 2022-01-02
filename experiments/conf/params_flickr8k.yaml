@@ -1,7 +1,7 @@
 # general
 experiment_name: ""              # prefix of all artifacts ('' means None, create next name)
 seed: 42                         # random seed
-with_cuda: False                  # CUDA training
+with_cuda: True                  # CUDA training
 path_save: "experiments/logs"    # path to save all artifacts (models, checkpoints, logs)
 new_folder: True                 # to handle all experiments in new folders
 bleu_n: 3
