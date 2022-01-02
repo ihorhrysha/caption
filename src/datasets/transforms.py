@@ -6,6 +6,7 @@ from datasets.vocab import Vocabulary
 
 def tokenize_nltk(caption:str)-> list[str]:
     import nltk
+    nltk.download('punkt')
     return nltk.tokenize.word_tokenize(str.lower(caption))
 
 def caption_to_tensor(tokens: list[str]) -> Tensor:

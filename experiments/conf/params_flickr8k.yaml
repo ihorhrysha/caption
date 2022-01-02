@@ -37,7 +37,7 @@ DATASET:
     threshold: 5
     train: "flickr8k"           
     val: "flickr8k_init"             
-  tiny: True
+  tiny: False
 
 LOG:
   iter_interval: 1     # how often (iter) display training details
