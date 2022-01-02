@@ -1,4 +1,4 @@
-from models.resnet_152_lstm import DecoderRNN, EncoderCNN
+from models.resnet_152_lstm import ResNet152LSTM
 from models.resnet_50_lstm import ResNet50LSTM
 
 import torch
@@ -11,29 +11,25 @@ class ModelFactory(object):
     """
 
     @staticmethod
-    def create(params, vocab):
+    def create(params, vocab_size):
         """
         Creates Model based on detector type
         :param params: Model settings
         :return: Model instance. In case of unknown Model type throws exception.
         """
 
-        # if params['MODEL']['name'] == 'resnet_152_lstm':
-            
-        #     encoder = EncoderCNN(
-        #         embed_size=params['MODEL']['encoder']['embed_size']
-        #     )
-        #     decoder = DecoderRNN(
-        #         embed_size=params['MODEL']['encoder']['embed_size'],
-        #         hidden_size=params['MODEL']['decoder']['hidden_size'],
-        #         vocab_size=len(vocab),
-        #         num_layers=params['MODEL']['decoder']['num_layers']
-        #     )
-        if params['MODEL']['name'] == 'resnet_50_lstm':
+        if params['MODEL']['name'] == 'resnet_152_lstm':
+            model = ResNet152LSTM(
+                embed_size=params['MODEL']['embed_size'],
+                hidden_size=params['MODEL']['hidden_size'],
+                vocab_size=vocab_size,
+                num_layers=params['MODEL']['num_layers']
+            )
+        elif params['MODEL']['name'] == 'resnet_50_lstm':
             model = ResNet50LSTM(
                 embed_size=params['MODEL']['embed_size'],
                 hidden_size=params['MODEL']['hidden_size'],
-                vocab_size=len(vocab),
+                vocab_size=vocab_size,
                 num_layers=params['MODEL']['num_layers']
             )
         else:

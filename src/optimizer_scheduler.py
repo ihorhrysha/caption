@@ -1,10 +1,11 @@
 import torch
+from torch.nn.modules.module import Module
 from utils import load_checkpoint
 
 
-def set_optimizer_scheduler(params, model, log):
+def set_optimizer_scheduler(params, model:Module, log):
     
-    model_params = model.parameters()
+    model_params = model.optim_params
 
     # optimizer
     if params['TRAIN']['optim'] == "sgd":
@@ -25,11 +26,11 @@ def set_optimizer_scheduler(params, model, log):
         raise ValueError('The settings for optimize are not recognized.')
 
     # resume from a checkpoint
-    start_epoch, best_prec = 0, 0
-    # if len(params['TRAIN']['resume']) > 0:
-        # start_epoch, best_prec = load_checkpoint(log, model,
-        #                                          params['TRAIN']['resume'],
-        #                                          optimizer)
+    start_epoch, best_metric = 0, 0
+    if len(params['TRAIN']['resume']) > 0:
+        start_epoch, best_metric = load_checkpoint(log, model,
+                                                 params['TRAIN']['resume'],
+                                                 optimizer)
 
         
 
@@ -41,4 +42,4 @@ def set_optimizer_scheduler(params, model, log):
     else:
         scheduler = None
 
-    return optimizer, scheduler, start_epoch, best_prec
+    return optimizer, scheduler, start_epoch, best_metric

@@ -3,6 +3,8 @@ import warnings
 
 import numpy as np
 import torch
+from torch.nn.modules.module import Module
+from torch.optim.optimizer import Optimizer
 
 
 def handle_device(with_cuda):
@@ -25,21 +27,21 @@ def handle_device(with_cuda):
     return device
 
 
-def load_checkpoint(log, model, checkpoint_file, optimizer):
+def load_checkpoint(log, model:Module, checkpoint_file, optimizer:Optimizer):
 
     if os.path.isfile(checkpoint_file):
         checkpoint = torch.load(checkpoint_file)
-        best_prec = checkpoint['best_prec']
+        best_metric = checkpoint['best_metric']
         start_epoch = checkpoint['epoch']
         model.load_state_dict(checkpoint['state_dict'])
         optimizer.load_state_dict(checkpoint['optimizer'])
         log.log_global("=> loaded checkpoint '{}' (epoch {})".format(checkpoint_file, start_epoch))
-        return start_epoch, best_prec
+        return start_epoch, best_metric
     else:
         raise ValueError("load_checkpoint: The checkpoint: " + checkpoint_file + " does not exist.")
 
 
-def save_checkpoint(state, model, params, is_best):
+def save_checkpoint(state, model:Module, params:dict, is_best:bool):
     if is_best:
         # model
         save_name = os.path.join(params['path_save'],

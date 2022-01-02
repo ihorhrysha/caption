@@ -39,7 +39,7 @@ class Vocabulary:
         if isinstance(word_or_index, list):
             return [self._call_one(word_or_index=one, return_index=return_index) for one in word_or_index]
         else:
-            self._call_one(word_or_index=word_or_index, return_index=return_index)
+            return self._call_one(word_or_index=word_or_index, return_index=return_index)
             
 
     def __len__(self):

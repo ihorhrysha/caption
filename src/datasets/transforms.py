@@ -50,13 +50,32 @@ tokenizer = {
 def get_tokenizer(tokenizer_key:str)->Callable:
     return tokenizer[tokenizer_key]
 
-def get_transforms(key:str, tokenizer_key:str, vocab:Callable) -> Tuple[Callable, Callable]:
+
+
+class CaptionsTokenizer:
+    def __init__(self, tokenizer) -> None:
+        self.tokenizer = tokenizer
+
+    def __call__(self, captions:list[str])->list[list[str]]:
+        return [self.tokenizer(caption) for caption in captions]
+
+    def __repr__(self):
+        return self.__class__.__name__ + "(tokenizer={0})".format(self.tokenizer)
+    
+
+def get_transforms(key:str, tokenizer_key:str, vocab:Callable, is_train:bool = True) -> Tuple[Callable, Callable]:
     transform = input[key]
     tokenizer = get_tokenizer(tokenizer_key)
-    transform_target = T.Compose([
-        tokenizer,
-        add_start_end,
-        vocab,
-        caption_to_tensor,
-    ])
+    
+    if is_train:
+        transform_target = T.Compose([
+            tokenizer,
+            add_start_end,
+            vocab,
+            caption_to_tensor,
+        ])
+    else:
+        #for validation dataset we need to tokenize all caps
+        transform_target = CaptionsTokenizer(tokenizer=tokenizer)
+        
     return transform, transform_target

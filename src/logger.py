@@ -6,16 +6,6 @@ import warnings
 from thirdparty.timer import Timer
 
 
-def create_plot_window(vis, xlabel, ylabel, title, env):
-    return vis.line(X=np.array([1]), Y=np.array([np.nan]), env=env,
-                    opts=dict(xlabel=xlabel, ylabel=ylabel, title=title))
-
-
-def create_plot_window_two(vis, xlabel, ylabel, title, legends, env):
-    return vis.line(X=np.array([[1, 1]]), Y=np.array([[np.nan, np.nan]]), env=env,
-                    opts=dict(xlabel=xlabel, ylabel=ylabel, title=title, markers=['o', 'o'], legend=legends))
-
-
 def dict2str(d, start_n=0):
     res = ""
     prefix_val = " " * start_n
@@ -30,7 +20,6 @@ def dict2str(d, start_n=0):
 class Logger(object):
     def __init__(self, params):
 
-        self.with_visdom = params['LOG']['visdom']
         self.with_tensorboard = params['LOG']['tensorboard']
         self.with_wandb = params['LOG'].get('wandb', False)
 
@@ -53,9 +42,9 @@ class Logger(object):
         # init all files
         self.f_log_iter.write("{:>6} {:>14} {:>14}\n".format('iter', 'loss', 'elapsed_time'))
         self.f_log_iter.flush()
-        self.f_log_epoch.write("{:>6} {:>14} {:>14} {:>14} {:>14} {:>14}\n".
+        self.f_log_epoch.write("{:>6} {:>14} {:>14} {:>14}\n".
                                format('epoch',
-                                      'avg_acc_train', 'avg_loss_train', 'avg_acc_val', 'avg_loss_val',
+                                      'avg_loss_train', 'avg_metric_val',
                                       'elapsed_time'))
         self.f_log_epoch.flush()
 
@@ -78,26 +67,6 @@ class Logger(object):
             }
             self.wandb = wandb
 
-        # make visdom logging
-        if self.with_visdom:
-
-            import visdom
-
-            self.writer_vis = visdom.Visdom()
-            if not self.writer_vis.check_connection():
-                self.with_visdom = False
-                warnings.warn("WARNING: Visdom server not running. Please run python -m visdom.server")
-            else:
-                self.writer_vis.close(win=None, env=self.experiment_name)
-
-                self.train_loss_window = create_plot_window(self.writer_vis, '#Iterations', 'Loss',
-                                                            'Training Loss', env=self.experiment_name)
-                self.avg_loss_window = create_plot_window_two(self.writer_vis, '#Epochs', 'Loss',
-                                                              'Average Loss', ['train', 'test'],
-                                                              env=self.experiment_name)
-                self.avg_acc_window = create_plot_window_two(self.writer_vis, '#Epochs', 'Accuracy',
-                                                             'Average Accuracy', ['train', 'test'],
-                                                             env=self.experiment_name)
         # make TensorBoard logging
         if self.with_tensorboard:
             from torch.utils.tensorboard import SummaryWriter
@@ -121,52 +90,33 @@ class Logger(object):
                 "{:6d} {:14.4f} {:>14}\n".format(globaliter, loss, time_str))
             self.f_log_iter.flush()
 
-            # visdom log
-            if self.with_visdom:
-                self.writer_vis.line(X=np.array([globaliter]),
-                                     Y=np.array([loss]),
-                                     update='append', win=self.train_loss_window, env=self.experiment_name)
-
             # tb log
             if self.with_tensorboard:
                 self.writer_tb.add_scalar('Train/RunningLoss', loss, globaliter)
 
     def log_epoch(self,
                   n_epoch,
-                  acc_train, loss_train, acc_val, loss_val, is_best, time_str):
+                  loss_train, metric_val, is_best, time_str):
 
         # log details
-        log_string = ("Epoch [{:^5}]: Train Avg accuracy: {:.4f}; Train Avg loss: {:.4f} \n".format(n_epoch, acc_train, loss_train) +
-                      "{:14} Valid Avg accuracy: {:.4f}; Valid Avg loss: {:.4f} \n".format(" ", acc_val, loss_val) +
+        log_string = ("Epoch [{:^5}]: Train Avg loss: {:.4f} \n".format(n_epoch, loss_train) +
+                      "{:14} Val Avg Metric: {:.4f};\n".format(" ", metric_val) +
                       "{:14} Time: {}".format(" ", time_str) +
                       ("\n{:14} BEST MODEL SAVED".format(" ") if is_best else ""))
         self.log_global(log_string)
 
-        self.f_log_epoch.write("{:6d} {:14.4f} {:14.4f} {:14.4f} {:14.4f} {:>14}\n".
-                               format(n_epoch, acc_train, loss_train, acc_val, loss_val, time_str))
+        self.f_log_epoch.write("{:6d} {:14.4f} {:14.4f} {:>14}\n".
+                               format(n_epoch, loss_train, metric_val, time_str))
         self.f_log_epoch.flush()
-
-        # make visdom logging
-        if self.with_visdom:
-            self.writer_vis.line(X=np.array([[n_epoch, n_epoch]]),
-                                 Y=np.array([[loss_train, loss_val]]),
-                                 opts=dict(legend=['train', 'test']),
-                                 win=self.avg_loss_window, update='append', env=self.experiment_name)
-            self.writer_vis.line(X=np.array([[n_epoch, n_epoch]]),
-                                 Y=np.array([[acc_train, acc_val]]),
-                                 opts=dict(legend=['train', 'test']),
-                                 win=self.avg_acc_window, update='append', env=self.experiment_name)
 
         if self.with_tensorboard:
             self.writer_tb.add_scalar('Train/Loss', loss_train, n_epoch)
-            self.writer_tb.add_scalar('Train/Accuracy', acc_train, n_epoch)
-            self.writer_tb.add_scalar('Test/Loss', loss_val, n_epoch)
-            self.writer_tb.add_scalar('Test/Accuracy', acc_val, n_epoch)
+            self.writer_tb.add_scalar('Val/Metric', metric_val, n_epoch)
 
         if self.with_wandb:
             self.wandb.log({
                 "loss_train": loss_train, 
-                "loss_val": loss_val
+                "metric_val": metric_val
             })
 
     def log_global(self, log_str):

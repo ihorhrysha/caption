@@ -12,27 +12,27 @@ from parse_args import parse_arguments
 from train_validate import train_epoch, validate
 from constants import TRAIN, VAL
 
-def train(params, log):
+def train(params: dict, log: Logger):
     # specify dataset
     data = DatasetFactory.create(params)
 
-    vocab = data.dataset[TRAIN].vocab
-
     # specify model
-    model = ModelFactory.create(params, vocab)
+    model = ModelFactory.create(params, len(data.vocab))
 
     # define loss function (criterion)
     criterion = set_loss_function(params)
 
     # optimizer & scheduler & load from checkpoint
-    optimizer, scheduler, start_epoch, best_score = set_optimizer_scheduler(params, model, log)
+    optimizer, scheduler, start_epoch, best_metric = set_optimizer_scheduler(params, model, log)
 
+    bleu_n = params['bleu_n']
     # log details
     log_string = "\n" + "==== NET MODEL:\n" + str(model)
     log_string += "\n" + "==== OPTIMIZER:\n" + str(optimizer) + "\n"
     log_string += "\n" + "==== SCHEDULER:\n" + str(scheduler) + "\n"
-    log_string += "\n" + "==== DATASET (TRAIN):\n" + str(data.dataset['train']) + "\n" ### add daset __repr__
+    log_string += "\n" + "==== DATASET (TRAIN):\n" + repr(data.dataset['train']) + "\n" 
     log_string += "\n" + "==== DATASET (VAL):\n" + repr(data.dataset['val']) + "\n"
+    log_string += "\n" + "==== METRIC: BLEU-"+str(bleu_n)+"\n"
     log.log_global(log_string)
    
     # train
@@ -40,35 +40,39 @@ def train(params, log):
     for epoch in range(start_epoch, params['TRAIN']['epochs']):
 
         # train for one epoch
-        _, _ = train_epoch(data.loader[TRAIN], model, criterion, optimizer, scheduler, epoch,
+        loss_train = train_epoch(data.loader[TRAIN], model, criterion, optimizer, scheduler, epoch,
                            device, log)
 
-        # evaluate on train set
-        acc_train, loss_train = validate(data.loader[TRAIN], model, criterion, device)
+        # ??? evaluate on train set
 
         # evaluate on validation set
-        acc_val, loss_val = validate(data.loader[VAL], model, criterion, device)
+        metric_val = validate(
+            val_loader=data.loader[VAL],
+            model=model, 
+            vocab=data.vocab,
+            bleu_n=bleu_n,
+            device=device
+        )
 
-        is_best=False
-        # # remember best prec@1
-        # is_best = acc_val > best_prec
-        # best_prec = max(acc_val, best_prec)
+        # remember best metric
+        is_best = metric_val > best_metric
+        best_metric = max(metric_val, best_metric)
 
-        # # save checkpoint
-        # if params['LOG']['do_checkpoint']:
-        #     save_checkpoint({
-        #         'epoch': epoch + 1,
-        #         'state_dict': model.state_dict(),
-        #         'best_prec': best_prec,
-        #         'optimizer': optimizer.state_dict(),
-        #         'scheduler': scheduler
-        #     }, model, params, is_best)
+        # save checkpoint
+        if params['LOG']['do_checkpoint']:
+            save_checkpoint({
+                'epoch': epoch + 1,
+                'state_dict': model.state_dict(),
+                'best_metric': best_metric,
+                'optimizer': optimizer.state_dict(),
+                'scheduler': scheduler
+            }, model, params, is_best)
 
         # logging results
         time_string = log.timers['global'].current2str()  # get current time
         log.log_epoch(epoch + 1,
-                      acc_train, loss_train,
-                      acc_val, loss_val,
+                      loss_train,
+                      metric_val,
                       is_best, time_string)
 
 
