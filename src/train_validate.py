@@ -57,9 +57,10 @@ def train_epoch(
     return losses.avg.to('cpu').item()
 
 
-def validate(val_loader: DataLoader, model:Module, vocab:Vocabulary, device, bleu_n:int = 4, ):
+def validate(val_loader: DataLoader, model:Module, vocab:Vocabulary, epoch:int, device, bleu_n:int, log:Logger):
 
     list_of_references=[]
+    list_of_references_sent=[]
     hypotheses = []
 
     # switch to evaluate mode
@@ -88,7 +89,13 @@ def validate(val_loader: DataLoader, model:Module, vocab:Vocabulary, device, ble
                     hypothesis.append(word)
 
                 list_of_references.append(captions[i])
+                list_of_references_sent.append([" ".join(caption) for caption in captions[i]])
                 hypotheses.append(hypothesis)
 
+    example_table = {
+        "hypothesis": [" ".join(hypothesis) for hypothesis in hypotheses],
+        "references": ["\n".join(references_sent) for references_sent in list_of_references_sent]
+    }
+    
     bleu_weights = [1/bleu_n]*bleu_n
-    return corpus_bleu(list_of_references=list_of_references, hypotheses=hypotheses, weights=bleu_weights)
+    return corpus_bleu(list_of_references=list_of_references, hypotheses=hypotheses, weights=bleu_weights), example_table

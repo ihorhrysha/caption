@@ -2,7 +2,6 @@ from models.resnet_152_lstm import ResNet152LSTM
 from models.resnet_50_lstm import ResNet50LSTM
 
 import torch
-from models.init_net import init_net
 
 
 class ModelFactory(object):
@@ -37,8 +36,6 @@ class ModelFactory(object):
 
         # if len(params['MODEL']['weights']) > 0:
         #     net.load_state_dict(torch.load(params['MODEL']['weights']))
-        # else:
-        #     init_net(net, params['MODEL']['init'])
 
         model = model.to(params['device'])
 

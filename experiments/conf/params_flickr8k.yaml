@@ -1,25 +1,21 @@
 # general
+project_name: "image-captioning"
 experiment_name: ""              # prefix of all artifacts ('' means None, create next name)
 seed: 42                         # random seed
 with_cuda: True                  # CUDA training
 path_save: "experiments/logs"    # path to save all artifacts (models, checkpoints, logs)
 new_folder: True                 # to handle all experiments in new folders
-bleu_n: 3
 
 TRAIN:
   resume: ""
   epochs: 5
   optim: "adam"                   # support also "adam", "rmsprop"
   lr: 0.001                       # this is for "sgd" optimizer
-  # momentum: 0.9                  # this is for "sgd" optimizer
-  # weight_decay: 0.0005           #
   scheduler: ""            # "StepLR" or ""
-  # lr_schedule_step: 40           #
-  # lr_schedule_gamma: 0.1         #
+  bleu_n: 3
 
 MODEL:
   name: "resnet_152_lstm"        # could be 'resnet_152_lstm', 'vgg_bn_pre_in3x32x32_out10', 'vgg_bn_in3x32x32_out10'
-  init: "default"                # "default" or  "resnet" or "xavier"
   weights: ""                    #
   embed_size: 256
   hidden_size: 512
@@ -37,10 +33,12 @@ DATASET:
     threshold: 5
     train: "flickr8k"           
     val: "flickr8k_init"             
-  tiny: False
+  tiny: True
 
 LOG:
   iter_interval: 1     # how often (iter) display training details
   tensorboard: False
-  wandb: False
+  wandb: 
+    enable: True
+    entity: "grego"
   do_checkpoint: False

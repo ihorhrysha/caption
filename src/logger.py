@@ -1,7 +1,9 @@
-import numpy as np
 import os
-import datetime
-import warnings
+from typing import Dict
+
+from torch.nn.modules.module import Module
+import wandb
+from wandb.sdk.wandb_run import Run
 
 from thirdparty.timer import Timer
 
@@ -21,18 +23,26 @@ class Logger(object):
     def __init__(self, params):
 
         self.with_tensorboard = params['LOG']['tensorboard']
-        self.with_wandb = params['LOG'].get('wandb', False)
+        self.with_wandb = params['LOG']['wandb']['enable']
 
         self.experiment_name = params['experiment_name']
         self.iter_interval = params['LOG']['iter_interval']
         self.num_epochs = params['TRAIN']['epochs']
 
-        path_log_files = os.path.join(params['path_save'], self.experiment_name)
+        self.path_log_files = os.path.join(params['path_save'], self.experiment_name)
 
+        # timer
+        self.timers = {'global': Timer()}
+        self.timers['global'].tic()
+        
+        self.params = params
+
+    def __enter__(self):
+        
         # log files names
-        filename_log_epoch = path_log_files + "_log_epoch.txt"
-        filename_log_iter = path_log_files + "_log_iter.txt"
-        filename_global = path_log_files + "_log.txt"
+        filename_log_epoch = self.path_log_files + "_log_epoch.txt"
+        filename_log_iter = self.path_log_files + "_log_iter.txt"
+        filename_global = self.path_log_files + "_log.txt"
 
         # create and open log files
         self.f_log_iter = open(filename_log_iter, "w+")
@@ -48,31 +58,34 @@ class Logger(object):
                                       'elapsed_time'))
         self.f_log_epoch.flush()
 
-        now = datetime.datetime.now()
-        str2log = str(now) + "\n\n" + "==== PARAMETERS:\n" + dict2str(params)
-        self.log_global(str2log)
-
-        # timer
-        self.timers = {'global': Timer()}
-        self.timers['global'].tic()
-
         if self.with_wandb:
-            import wandb
-            wandb.init(project="image-captioning", entity="grego")
+            self.wandb_run:Run = wandb.init(
+                project=self.params['project_name'], 
+                entity=self.params['LOG']['wandb']['entity'], 
+                config=self.params
+            )
 
-            wandb.config = {
-                **params['MODEL'],
-                **params['TRAIN'],
-                **params['DATASET']
-            }
-            self.wandb = wandb
 
         # make TensorBoard logging
         if self.with_tensorboard:
             from torch.utils.tensorboard import SummaryWriter
 
             # set-up writer
-            self.writer_tb = SummaryWriter(params['path_save'])
+            self.writer_tb = SummaryWriter(self.params['path_save'])
+
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        # close log files
+        if self.with_wandb:
+            self.wandb_run.finish(exit_code=int(exc_val is not None))
+        self.f_log_iter.close()
+        self.f_log_epoch.close()
+        self.f_log_global.close()
+
+    def watch(self, model:Module, criterion=None) -> None:
+        if self.with_wandb:
+            self.wandb_run.watch(models=model, criterion=criterion)
 
     def log_iter(self, iter_current, epoch_current, num_iter, loss, time_str):
 
@@ -94,9 +107,14 @@ class Logger(object):
             if self.with_tensorboard:
                 self.writer_tb.add_scalar('Train/RunningLoss', loss, globaliter)
 
+            if self.with_wandb:
+                self.wandb_run.log({
+                    "loss_train_iter": loss, 
+                })
+
     def log_epoch(self,
                   n_epoch,
-                  loss_train, metric_val, is_best, time_str):
+                  loss_train, metric_val, example_table: Dict, is_best, time_str):
 
         # log details
         log_string = ("Epoch [{:^5}]: Train Avg loss: {:.4f} \n".format(n_epoch, loss_train) +
@@ -114,19 +132,22 @@ class Logger(object):
             self.writer_tb.add_scalar('Val/Metric', metric_val, n_epoch)
 
         if self.with_wandb:
-            self.wandb.log({
+            if is_best:
+                self.wandb_run.summary["best_metric"] = metric_val
+
+            wandb_table = wandb.Table(
+                columns=list(example_table.keys()), 
+                data=[list(row) for row in zip(*list(example_table.values()))]
+            )
+            self.wandb_run.log({
                 "loss_train": loss_train, 
-                "metric_val": metric_val
+                "metric_val": metric_val,
+                "example_table": wandb_table,
+                "epoch": n_epoch,
+                "is_best": is_best
             })
 
     def log_global(self, log_str):
         self.f_log_global.write(log_str + "\n")
         self.f_log_global.flush()
         print(log_str)
-
-    def close(self):
-        # close log files
-        self.f_log_iter.close()
-        self.f_log_epoch.close()
-        self.f_log_global.close()
-

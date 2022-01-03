@@ -1,6 +1,6 @@
 import os
-
-from logger import Logger
+from datetime import datetime
+from logger import Logger, dict2str
 
 from models.model_factory import ModelFactory
 from datasets.ds_factory import DatasetFactory
@@ -18,40 +18,56 @@ def train(params: dict, log: Logger):
 
     # specify model
     model = ModelFactory.create(params, len(data.vocab))
-
+    
     # define loss function (criterion)
     criterion = set_loss_function(params)
+
+    # log weights and bais
+    log.watch(model=model, criterion=criterion)
 
     # optimizer & scheduler & load from checkpoint
     optimizer, scheduler, start_epoch, best_metric = set_optimizer_scheduler(params, model, log)
 
-    bleu_n = params['bleu_n']
+    # define bleu ngram weights
+    bleu_n = params['TRAIN']['bleu_n']
+    
+    # train
+    device = params['device']
+
     # log details
-    log_string = "\n" + "==== NET MODEL:\n" + str(model)
+    log_string = str(datetime.now())
+    log_string += "\n\n" + "==== PARAMETERS:\n" + dict2str(params)
+    log_string += "\n\n" + "==== NET MODEL:\n" + str(model)
     log_string += "\n" + "==== OPTIMIZER:\n" + str(optimizer) + "\n"
     log_string += "\n" + "==== SCHEDULER:\n" + str(scheduler) + "\n"
     log_string += "\n" + "==== DATASET (TRAIN):\n" + repr(data.dataset['train']) + "\n" 
     log_string += "\n" + "==== DATASET (VAL):\n" + repr(data.dataset['val']) + "\n"
     log_string += "\n" + "==== METRIC: BLEU-"+str(bleu_n)+"\n"
     log.log_global(log_string)
-   
-    # train
-    device = params['device']
+       
     for epoch in range(start_epoch, params['TRAIN']['epochs']):
 
         # train for one epoch
-        loss_train = train_epoch(data.loader[TRAIN], model, criterion, optimizer, scheduler, epoch,
-                           device, log)
-
-        # ??? evaluate on train set
+        loss_train = train_epoch(
+            train_loader=data.loader[TRAIN], 
+            model=model, 
+            criterion=criterion, 
+            optimizer=optimizer, 
+            scheduler=scheduler, 
+            epoch=epoch+1,
+            device=device, 
+            log=log
+        )
 
         # evaluate on validation set
-        metric_val = validate(
+        metric_val, example_table = validate(
             val_loader=data.loader[VAL],
             model=model, 
             vocab=data.vocab,
             bleu_n=bleu_n,
-            device=device
+            device=device,
+            log=log,
+            epoch=epoch+1,
         )
 
         # remember best metric
@@ -70,10 +86,13 @@ def train(params: dict, log: Logger):
 
         # logging results
         time_string = log.timers['global'].current2str()  # get current time
-        log.log_epoch(epoch + 1,
-                      loss_train,
-                      metric_val,
-                      is_best, time_string)
+        log.log_epoch(n_epoch=epoch + 1,
+                      loss_train=loss_train,
+                      metric_val=metric_val,
+                      example_table=example_table,
+                      is_best=is_best, 
+                      time_str=time_string
+                      )
 
 
 if __name__ == "__main__":
@@ -90,10 +109,5 @@ if __name__ == "__main__":
         os.mkdir(params['path_save'])
 
     # logging & timer
-    logger = Logger(params)
-
-    # train
-    train(params, logger)
-
-    # close all log files
-    logger.close()
+    with Logger(params) as logger:
+        train(params, logger)
