@@ -32,6 +32,13 @@ input = {
         T.Normalize(MEAN, STD)
     ]),
 
+    'coco_init': T.Compose([
+        T.Resize(256,antialias=True),
+        T.CenterCrop(244),
+        T.ToTensor(), 
+        T.Normalize(MEAN, STD)
+    ]),
+
     'coco': T.Compose([
         T.Resize(size=(256,256),antialias=True),
         T.RandomCrop(244),

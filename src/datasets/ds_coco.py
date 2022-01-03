@@ -1,66 +1,14 @@
 import os
-from typing import List
 
-import torch
-
-import nltk
-from PIL import Image
 from pycocotools.coco import COCO
+from torch.utils.data import DataLoader, Subset
+import pandas as pd
 
-from datasets.transforms_coco import transforms
-from datasets.vocab import VocabularyBuilder, Vocabulary
-import torch.utils.data as data
+from datasets.transforms import get_transforms, get_tokenizer
+from datasets.vocab import VocabularyBuilder
 from constants import TRAIN,VAL
-from datasets.collate import collate_fn
-
-class CocoDataset(data.Dataset):
-    """COCO Custom Dataset compatible with torch.utils.data.DataLoader."""
-    def __init__(self, root, caption_path, vocab_path, transform=None):
-        """Set the path for images, captions and vocabulary wrapper.
-        
-        Args:
-            root: image directory.
-            caption_path: coco annotation file path.
-            vocab_path: path to vocab pkl
-            transform: image transformer.
-        """
-        self.root = root
-        self.coco: COCO = COCO(caption_path)
-        self.ids = list(self.coco.anns.keys())
-        self.vocab: Vocabulary = VocabularyBuilder.get(
-            captions=[self.coco.anns[id]['caption'] for id in self.coco.anns.keys()],
-            threshold=4,
-            vocab_path=vocab_path,
-            tokenizer=self.tokenizer
-        )
-        self.transform = transform
-    
-    @staticmethod
-    def tokenizer(caption:str)-> List[str]:
-        return nltk.tokenize.word_tokenize(str(caption).lower())
-
-    def __getitem__(self, index):
-        """Returns one data pair (image and caption)."""
-
-        ann_id = self.ids[index]
-        caption = self.coco.anns[ann_id]['caption']
-        img_id = self.coco.anns[ann_id]['image_id']
-        path = self.coco.loadImgs(img_id)[0]['file_name']
-
-        image = Image.open(os.path.join(self.root, path)).convert('RGB')
-        if self.transform is not None:
-            image = self.transform(image)
-
-        # Convert caption (string) to word ids.
-        target = torch.Tensor([
-            self.vocab(self.vocab.START),
-            *[self.vocab(token) for token in self.tokenizer(caption)],
-            self.vocab(self.vocab.END)
-        ])
-        return image, target
-
-    def __len__(self):
-        return len(self.ids)
+from datasets.collate import collate_fn, collate_val_fn
+from datasets.caption_dataset import CaptionDataset
 
 class CocoDataProvider:
     """
@@ -75,36 +23,81 @@ class CocoDataProvider:
                  batch_sizes=None,
                  download=False,
                  tiny=False,
-                 transform_keys=None):
+                 transform_config=None):
 
-        path_ann = path_ann or os.path.join(path_data, 'annotations')
-        path_vocab = path_vocab or os.path.join(path_data, 'vocab')
-
-        transform_keys = transform_keys or {TRAIN: "init", VAL: "init"}
-        batch_sizes = batch_sizes or {TRAIN: 64, VAL: 64}
         data_type_labels ={
             TRAIN: "train2014",
             VAL: "val2014"
         }
 
-        self.dataset: dict[str, CocoDataset] = {}
-        self.loader: dict[str, data.DataLoader] = {}
+        path_ann = path_ann or os.path.join(path_data, 'annotations')
+        path_vocab = path_vocab or path_data
+
+        batch_sizes = batch_sizes or {TRAIN: 64, VAL: 64}
+        transform_config = transform_config or {TRAIN: 'coco', VAL: 'coco_init', 'tokenizer':'nltk', 'threshold':4}
+
+        self.dataset: dict[str, CaptionDataset] = {}
+        self.loader: dict[str, DataLoader] = {}
+        
+        filename_caption = {
+            TRAIN: self.coco2pd(caption_path = os.path.join(path_ann, f"captions_{data_type_labels[TRAIN]}.json")), 
+            VAL: self.coco2pd(caption_path = os.path.join(path_ann, f"captions_{data_type_labels[VAL]}.json"))
+        }
+        
+        # we need only one vocab for train dataset, validation should be done with train vocab,
+        # it is better to store vocab on provider level
+        self.vocab = VocabularyBuilder.get(
+            captions=filename_caption[TRAIN]["caption"].to_list(),
+            threshold=transform_config['threshold'],
+            vocab_path=os.path.join(path_vocab,f'vocab.pkl'),
+            tokenizer=get_tokenizer(transform_config['tokenizer'])
+        )
+
         for data_type in [TRAIN, VAL]:
             
-            data_type_label = data_type_labels[data_type]
-            caption_path = os.path.join(path_ann, f"captions_{data_type_label}.json")
-
-            self.dataset[data_type] = CocoDataset(
-                root=os.path.join(path_data, data_type_label),
-                caption_path=caption_path,
-                vocab_path=os.path.join(path_vocab,f'{data_type}.pkl'),
-                transform=transforms[transform_keys[data_type]]
+            transform, target_transform = get_transforms(
+                key=transform_config[data_type],
+                tokenizer_key=transform_config['tokenizer'],
+                vocab=self.vocab,
+                is_train=(data_type == TRAIN)
             )
 
-            self.loader[data_type] = data.DataLoader(
+            self.dataset[data_type] = CaptionDataset(
+                root=os.path.join(path_data, data_type_labels[data_type]),
+                filename_caption=filename_caption[data_type],
+                transform=transform,
+                target_transform=target_transform,
+                is_train=(data_type == TRAIN)
+            )
+
+            self.loader[data_type] = DataLoader(
                 dataset=self.dataset[data_type],
                 batch_size=batch_sizes[data_type],
                 shuffle=(data_type == TRAIN),
                 num_workers=num_workers,
-                collate_fn=collate_fn
+                collate_fn=collate_fn if (data_type == TRAIN) else collate_val_fn
             )
+
+        if tiny:
+            for data_type in [TRAIN, VAL]:
+                self.dataset[data_type] = Subset(self.dataset[data_type], range(batch_sizes[data_type]))
+                self.loader[data_type] = DataLoader(
+                    self.dataset[data_type], 
+                    batch_size=batch_sizes[data_type],
+                    collate_fn=collate_fn if (data_type == TRAIN) else collate_val_fn
+                )
+
+    @staticmethod
+    def coco2pd(caption_path:str):
+        coco: COCO = COCO(caption_path)
+
+        img_id2filename = {img_id: img_info['file_name'] for img_id, img_info in coco.imgs.items()}
+
+        captions = []
+        images = []
+ 
+        for _, caption_info in coco.anns.items():
+            images.append(img_id2filename[caption_info['image_id']])
+            captions.append(caption_info['caption'])
+
+        return pd.DataFrame({"image":images, "caption":captions})

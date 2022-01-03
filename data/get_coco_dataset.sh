@@ -32,8 +32,6 @@ if ! [ -d ${DATASET_NAME} ]; then
     unzip $FILE_TRAIN -d $DATASET_NAME
     rm $FILE_TRAIN
 
-    mkdir ${DATASET_NAME}/vocab
-
 else
     echo "file exists"
 fi
