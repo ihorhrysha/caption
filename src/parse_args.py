@@ -1,62 +1,67 @@
 from argparse import ArgumentParser
+from typing import Any, Dict 
+import yaml  
+from distutils.util import strtobool
 
-import yaml
 
+def set_arg_config(k:str, v:str, params:Dict[str, Any]):
+    path_segments = k.split("__")
+
+    # first level should not change
+    if path_segments[0] not in params:
+        return
+
+    known_types = {
+        int:int, 
+        float:float, 
+        bool: lambda x: bool(strtobool(x)),
+        str:str
+    }
+    
+    current_position = params
+    for idx, path_segment in enumerate(path_segments):
+        if idx+1 == len(path_segments):
+            # casting type
+            if path_segment in current_position:
+                cur_val = current_position[path_segment]
+                cur_type = type(cur_val)
+                if cur_type in known_types:
+                    try:
+                        v = known_types[cur_type](v)
+                    except:
+                        print("casting error")
+                else:
+                    print(f"unknown type for {cur_type} for arg {k} ")
+                    v=cur_val
+            
+            # set value
+            current_position[path_segment] = v
+        else:
+            # go deeper
+            if path_segment not in current_position:
+                current_position[path_segment] = {}
+            current_position = current_position[path_segment]
 
 def parse_arguments():
-
     parser = ArgumentParser()
-    parser.add_argument('--param_file', type=str, help='configure file with parameters')
-    parser.add_argument('--TRAIN_lr', default=None, type=float, help='initial learning rate')
-    parser.add_argument('--TRAIN_weight_decay', default=None, type=float)
-    parser.add_argument('--TRAIN_epochs', default=None, type=int, help='number of training epochs')
-    parser.add_argument('--TRAIN_optim', default=None, type=str, help='training optimizer')
-    parser.add_argument('--DATASET_batch_size', default=None, type=int, help='train batch size')
-    parser.add_argument('--DATASET_tiny', default=None, type=bool, help='train on tiny subset') # TODO : bool in args
-    parser.add_argument('--DATASET_transforms_train', default=None, type=str, help='train transform')
-    parser.add_argument('--DATASET_transforms_val', default=None, type=str, help='val transform')
-    parser.add_argument('--MODEL_name', default=None, type=str)
-    parser.add_argument('--MODEL_init', default=None, type=str)
-    parser.add_argument('--MODEL_weights', default=None, type=str)
-    args = parser.parse_args()
+    parser.add_argument('--param_file', '-f', type=str, help='configure file with parameters')
+    args, unknowns = parser.parse_known_args()
 
     # parse param file
     with open(args.param_file, 'r') as f:
         params = yaml.safe_load(f)
 
-    # addition configurations
-    if args.TRAIN_weight_decay is not None:
-        params['TRAIN']['weight_decay'] = args.TRAIN_weight_decay
-
-    if args.TRAIN_lr is not None:
-        params['TRAIN']['lr'] = args.TRAIN_lr
-
-    if args.TRAIN_epochs is not None:
-        params['TRAIN']['epochs'] = args.TRAIN_epochs
-
-    if args.TRAIN_optim is not None:
-        params['TRAIN']['optim'] = args.TRAIN_optim
-
-    if args.DATASET_batch_size is not None:
-        params['DATASET']['batch_sizes']['train'] = args.DATASET_batch_size
-        params['DATASET']['batch_sizes']['val'] = args.DATASET_batch_size
-    
-    if args.DATASET_tiny is not None:
-        params['DATASET']['tiny'] = args.DATASET_tiny
-
-    if args.DATASET_transforms_val is not None:
-        params['DATASET']['transforms']['val'] = args.DATASET_transforms_val
-
-    if args.DATASET_transforms_train is not None:
-        params['DATASET']['transforms']['train'] = args.DATASET_transforms_train
-
-    if args.MODEL_name is not None:
-        params['MODEL']['name'] = args.MODEL_name
-
-    if args.MODEL_init is not None:
-        params['MODEL']['init'] = args.MODEL_init
-
-    if args.MODEL_weights is not None:
-        params['MODEL']['weights'] = args.MODEL_weights
+    # expect to have in "unknown" sequence of key-values
+    k=""
+    for arg in unknowns:
+        arg = arg.strip()
+        if arg.startswith("--"):
+            k=arg[2:]
+        else:
+            if k:
+                set_arg_config(k, arg, params=params)
+                k=""
+            else:
+                continue
 
     return params
