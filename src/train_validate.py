@@ -69,7 +69,7 @@ def validate(val_loader: DataLoader, model:Module, vocab:Vocabulary, epoch:int, 
     with torch.no_grad():
         for images, captions in val_loader:
             # Set mini-batch dataset
-            features = model.encoder(images) # [n, l, w, h]
+            features = model.encoder(images.to(device)) # [n, l, w, h]
             for i in range(len(captions)):
                 feature = features[i].unsqueeze(0).to(device)
 
