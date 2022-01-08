@@ -4,11 +4,10 @@ import torchvision.models as models
 from torch.nn.utils.rnn import pack_padded_sequence
 
 
-class EncoderCNN(nn.Module):
-    def __init__(self, embed_size):
-        """Load the pretrained ResNet-152 and replace top fc layer."""
-        super(EncoderCNN, self).__init__()
-        resnet = models.resnet152(pretrained=True)
+class ResnetEncoderCNN(nn.Module):
+    def __init__(self, embed_size, resnet:nn.Module):
+        """Load the pretrained ResNet and replace top fc layer."""
+        super(ResnetEncoderCNN, self).__init__()
         modules = list(resnet.children())[:-1]      # delete the last fc layer.
         self.resnet = nn.Sequential(*modules)
         self.linear = nn.Linear(resnet.fc.in_features, embed_size) # linear mapping to embed size
@@ -55,10 +54,10 @@ class DecoderRNN(nn.Module):
         sampled_ids = torch.stack(sampled_ids, 1)                # sampled_ids: (batch_size, max_seq_length)
         return sampled_ids
 
-class ResNet152LSTM(nn.Module):
+class ResNetLSTM(nn.Module):
     def __init__(self, embed_size, vocab_size, hidden_size, num_layers):
         super().__init__()
-        self.encoder = EncoderCNN(embed_size=embed_size)
+        self.encoder: nn.Module = None 
         self.decoder = DecoderRNN(
             embed_size=embed_size,
             vocab_size = vocab_size,
@@ -75,5 +74,20 @@ class ResNet152LSTM(nn.Module):
         outputs = self.decoder(features, captions, lengths)
         return outputs
 
-    def sample(images):
-        pass
+class ResNet152LSTM(ResNetLSTM):
+    def __init__(self, embed_size, vocab_size, hidden_size, num_layers):
+        super().__init__(embed_size, vocab_size, hidden_size, num_layers)
+        resnet = models.resnet152(pretrained=True)
+        self.encoder = ResnetEncoderCNN(embed_size=embed_size, resnet=resnet)
+
+class ResNe101LSTM(ResNetLSTM):
+    def __init__(self, embed_size, vocab_size, hidden_size, num_layers):
+        super().__init__(embed_size, vocab_size, hidden_size, num_layers)
+        resnet = models.resnet101(pretrained=True)
+        self.encoder = ResnetEncoderCNN(embed_size=embed_size, resnet=resnet)
+
+class ResNet50LSTM(ResNetLSTM):
+    def __init__(self, embed_size, vocab_size, hidden_size, num_layers):
+        super().__init__(embed_size, vocab_size, hidden_size, num_layers)
+        resnet = models.resnet50(pretrained=True)
+        self.encoder = ResnetEncoderCNN(embed_size=embed_size, resnet=resnet)

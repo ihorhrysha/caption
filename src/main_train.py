@@ -1,5 +1,6 @@
 import os
 from datetime import datetime
+from typing import Dict
 from logger import Logger, dict2str
 
 from models.model_factory import ModelFactory
@@ -12,7 +13,7 @@ from parse_args import parse_arguments
 from train_validate import train_epoch, validate
 from constants import TRAIN, VAL
 
-def train(params: dict, log: Logger):
+def train(params: Dict, log: Logger):
     # specify dataset
     data = DatasetFactory.create(params)
 

@@ -1,7 +1,4 @@
-from models.resnet_152_lstm import ResNet152LSTM
-from models.resnet_50_lstm import ResNet50LSTM
-
-import torch
+from models.resnet_lstm import ResNet152LSTM, ResNet50LSTM, ResNe101LSTM, ResNetLSTM
 
 
 class ModelFactory(object):
@@ -10,7 +7,7 @@ class ModelFactory(object):
     """
 
     @staticmethod
-    def create(params, vocab_size):
+    def create(params, vocab_size) -> ResNetLSTM:
         """
         Creates Model based on detector type
         :param params: Model settings
@@ -24,6 +21,13 @@ class ModelFactory(object):
                 vocab_size=vocab_size,
                 num_layers=params['MODEL']['num_layers']
             )
+        elif params['MODEL']['name'] == 'resnet_101_lstm':
+            model = ResNe101LSTM(
+                embed_size=params['MODEL']['embed_size'],
+                hidden_size=params['MODEL']['hidden_size'],
+                vocab_size=vocab_size,
+                num_layers=params['MODEL']['num_layers']
+            )            
         elif params['MODEL']['name'] == 'resnet_50_lstm':
             model = ResNet50LSTM(
                 embed_size=params['MODEL']['embed_size'],

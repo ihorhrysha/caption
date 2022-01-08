@@ -34,12 +34,12 @@ DATASET:
     threshold: 5
     train: "flickr8k"           
     val: "flickr8k_init"             
-  tiny: True
+  tiny: False
 
 LOG:
-  iter_interval: 1     # how often (iter) display training details
+  iter_interval: 100     # how often (iter) display training details
   tensorboard: False
   wandb: 
-    enable: True
+    enable: False
     entity: "grego"
   do_checkpoint: False

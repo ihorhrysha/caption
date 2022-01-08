@@ -1,1 +1,1 @@
-python src/main_train.py --param_file experiments/conf/params_base.yaml
+python src/main_train.py --param_file experiments/conf/params_base.yaml --MODEL__name resnet_50_lstm --DATASET__tiny True --LOG__iter_interval 1
